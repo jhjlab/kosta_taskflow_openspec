@@ -13,3 +13,5 @@ build/
 node_modules/
 .playwright-mcp/
 taskflow.db
+
+.vercel

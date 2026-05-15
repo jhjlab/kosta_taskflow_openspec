@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 로그인</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+<div class="w-full max-w-sm bg-white rounded-xl shadow p-8">
+  <div class="text-center mb-6">
+    <span class="bg-teal-600 text-white px-3 py-1 rounded font-bold text-lg">TaskFlow</span>
+  </div>
+
+  <div class="flex mb-6 border-b">
+    <button id="tab-login" onclick="switchTab('login')" class="flex-1 py-2 font-medium text-teal-600 border-b-2 border-teal-600">로그인</button>
+    <button id="tab-signup" onclick="switchTab('signup')" class="flex-1 py-2 font-medium text-gray-400">회원가입</button>
+  </div>
+
+  <form id="form-login" onsubmit="handleLogin(event)">
+    <input id="login-email" type="email" placeholder="이메일" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400">
+    <input id="login-password" type="password" placeholder="비밀번호" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400">
+    <div id="login-error" class="text-red-500 text-sm mb-3 hidden"></div>
+    <button type="submit" id="login-btn" class="w-full bg-teal-600 text-white py-2 rounded font-medium hover:bg-teal-700 disabled:bg-gray-400">로그인</button>
+  </form>
+
+  <form id="form-signup" class="hidden" onsubmit="handleSignup(event)">
+    <input id="signup-email" type="email" placeholder="이메일" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400">
+    <input id="signup-password" type="password" placeholder="비밀번호 (8자 이상)" required class="w-full border rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400">
+    <div id="signup-error" class="text-red-500 text-sm mb-3 hidden"></div>
+    <button type="submit" id="signup-btn" class="w-full bg-teal-600 text-white py-2 rounded font-medium hover:bg-teal-700 disabled:bg-gray-400">가입하기</button>
+  </form>
+</div>
+
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/api.js"></script>
+<script>
+function switchTab(t) {
+  document.getElementById('form-login').classList.toggle('hidden', t !== 'login');
+  document.getElementById('form-signup').classList.toggle('hidden', t !== 'signup');
+  document.getElementById('tab-login').className = `flex-1 py-2 font-medium ${t === 'login' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-400'}`;
+  document.getElementById('tab-signup').className = `flex-1 py-2 font-medium ${t === 'signup' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-400'}`;
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  btn.disabled = true; btn.textContent = '처리 중...';
+  errEl.classList.add('hidden');
+  try {
+    const data = await api.post('/auth/login', {
+      email: document.getElementById('login-email').value,
+      password: document.getElementById('login-password').value,
+    });
+    if (!data) return;
+    saveToken(data.token); saveUser(data.user);
+    location.href = data.user.team_id ? '/kanban.html' : '/team.html';
+  } catch (err) {
+    errEl.textContent = err.message; errEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = '로그인';
+  }
+}
+
+async function handleSignup(e) {
+  e.preventDefault();
+  const btn = document.getElementById('signup-btn');
+  const errEl = document.getElementById('signup-error');
+  btn.disabled = true; btn.textContent = '처리 중...';
+  errEl.classList.add('hidden');
+  try {
+    const data = await api.post('/auth/signup', {
+      email: document.getElementById('signup-email').value,
+      password: document.getElementById('signup-password').value,
+    });
+    if (!data) return;
+    saveToken(data.token); saveUser(data.user);
+    location.href = data.user.team_id ? '/kanban.html' : '/team.html';
+  } catch (err) {
+    errEl.textContent = err.message; errEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = '가입하기';
+  }
+}
+
+if (isLoggedIn()) {
+  const u = getCurrentUser();
+  location.href = u?.team_id ? '/kanban.html' : '/team.html';
+}
+</script>
+</body>
+</html>
