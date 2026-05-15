@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 채팅</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<header class="bg-white shadow px-4 py-3 flex items-center gap-4 flex-wrap">
+  <span class="bg-teal-600 text-white px-3 py-1 rounded font-bold">TaskFlow</span>
+  <span id="team-name" class="font-medium text-gray-700"></span>
+  <nav class="flex gap-2 ml-auto">
+    <a href="/kanban.html" class="px-3 py-1 bg-white border rounded text-sm hover:bg-gray-50">칸반</a>
+    <a href="/chat.html" class="px-3 py-1 bg-teal-600 text-white rounded text-sm">채팅</a>
+  </nav>
+  <span id="poll-status" class="text-xs text-green-500">● 5초마다 새로고침</span>
+  <button onclick="doLogout()" class="text-sm text-gray-500 hover:text-red-500">로그아웃</button>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4" id="messages-container">
+  <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64 text-gray-400">
+    <div class="text-5xl mb-3">💬</div>
+    <p class="font-medium">아직 대화가 없습니다</p>
+    <p class="text-sm mt-1">첫 메시지를 보내 팀원과 대화를 시작하세요</p>
+  </div>
+  <div id="messages-list" class="space-y-3"></div>
+</div>
+
+<div class="bg-white border-t p-3">
+  <div class="flex gap-2 items-end max-w-4xl mx-auto">
+    <div class="flex-1">
+      <textarea id="msg-input" rows="2" maxlength="1000" placeholder="메시지 입력 (1000자 이내)..."
+        class="w-full border rounded px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 text-sm"
+        oninput="updateCounter()" onkeydown="handleKey(event)"></textarea>
+      <div class="text-right text-xs mt-0.5">
+        <span id="char-count" class="text-gray-400">0 / 1000</span>
+      </div>
+    </div>
+    <button id="send-btn" onclick="sendMessage()" class="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm h-10">전송</button>
+  </div>
+</div>
+
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/api.js"></script>
+<script>
+if (!requireAuth()) {}
+const user = getCurrentUser();
+if (user && !user.team_id) location.href = '/team.html';
+if (user) {}
+
+let lastSince = null, pollTimer = null;
+
+async function loadTeam() {
+  if (!user?.team_id) return;
+  const t = await api.get(`/teams/${user.team_id}`);
+  if (t) document.getElementById('team-name').textContent = t.name + ' 팀 · 채팅';
+}
+
+async function fetchMessages() {
+  const url = `/teams/${user.team_id}/messages${lastSince ? '?since=' + encodeURIComponent(lastSince) : ''}`;
+  const data = await api.get(url);
+  if (!data) return;
+
+  if (data.length === 0 && !lastSince) {
+    document.getElementById('empty-state').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('empty-state').classList.add('hidden');
+
+  const list = document.getElementById('messages-list');
+  const atBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 50;
+
+  data.forEach(m => {
+    if (lastSince === null || new Date(m.created_at) > new Date(lastSince)) {
+      const isMe = m.user_id === user?.id;
+      const el = document.createElement('div');
+      el.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+      el.innerHTML = `
+        <div class="max-w-xs md:max-w-md">
+          ${!isMe ? `<p class="text-xs text-gray-500 mb-1">${escHtml(m.user_email)} · ${fmtTime(m.created_at)}</p>` : ''}
+          <div class="relative group">
+            <div class="${isMe ? 'bg-teal-600 text-white' : 'bg-white border'} rounded-xl px-3 py-2 text-sm">${escHtml(m.content)}</div>
+            ${isMe ? `<button onclick="deleteMsg(${m.id},this.closest('div.relative'))" class="hidden group-hover:block absolute top-0 right-0 -mr-6 text-red-400 hover:text-red-600 text-xs">🗑</button>` : ''}
+          </div>
+          ${isMe ? `<p class="text-xs text-gray-400 mt-1 text-right">${fmtTime(m.created_at)}</p>` : ''}
+        </div>`;
+      list.appendChild(el);
+      lastSince = m.created_at;
+    }
+  });
+
+  if (atBottom || !lastSince) window.scrollTo(0, document.body.scrollHeight);
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const content = input.value.trim();
+  if (!content) return;
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  try {
+    await api.post(`/teams/${user.team_id}/messages`, { content });
+    input.value = ''; updateCounter();
+    await fetchMessages();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally { btn.disabled = false; }
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function updateCounter() {
+  const len = document.getElementById('msg-input').value.length;
+  const el = document.getElementById('char-count');
+  el.textContent = `${len} / 1000`;
+  el.className = len > 1000 ? 'text-red-500' : 'text-gray-400';
+  document.getElementById('send-btn').disabled = len > 1000 || len === 0;
+}
+
+async function deleteMsg(id, el) {
+  const ok = await showConfirm('메시지를 삭제하시겠습니까?');
+  if (!ok) return;
+  await api.del(`/messages/${id}`);
+  el.closest('div.flex').remove();
+}
+
+async function doLogout() {
+  clearInterval(pollTimer);
+  await api.post('/auth/logout'); removeToken(); location.href = '/login.html';
+}
+
+loadTeam();
+fetchMessages().then(() => {
+  pollTimer = setInterval(fetchMessages, 5000);
+});
+
+window.addEventListener('beforeunload', () => clearInterval(pollTimer));
+</script>
+</body>
+</html>
