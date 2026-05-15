@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.db
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+node_modules/
+.playwright-mcp/
+taskflow.db

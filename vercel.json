@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" },
+    { "src": "frontend/**", "use": "@vercel/static" }
+  ],
+  "rewrites": [
+    { "source": "/auth/(.*)", "destination": "/api/index" },
+    { "source": "/teams(.*)", "destination": "/api/index" },
+    { "source": "/tasks(.*)", "destination": "/api/index" },
+    { "source": "/messages(.*)", "destination": "/api/index" },
+    { "source": "/docs", "destination": "/api/index" },
+    { "source": "/redoc", "destination": "/api/index" },
+    { "source": "/openapi.json", "destination": "/api/index" }
+  ]
+}
